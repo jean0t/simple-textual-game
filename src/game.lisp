@@ -67,3 +67,53 @@
 
 (defun inventory ()
   (cons 'items- (objects-at 'body *objects* *object-locations*)))
+
+
+;; REPL for the game
+(defparameter *allowed-commands* '(look walk pickup inventory)) ; limit allowed commands to the ones we actually use in the game
+
+;; custom eval
+(defun game-eval (sexp)
+  (if (member (car sexp) *allowed-commands*)
+    (eval sexp)
+    '(i do not know that command.)))
+
+
+;; custom read
+(defun game-read ()
+  (let ((cmd (read-from-string (concatenate 'string "(" (read-line) ")"))))
+    (flet ((quote-it (x) 
+                     (list 'quote x)))
+
+      (cons (car cmd) (mapcar #'quote-it (cdr cmd))))))
+
+
+;; custom print
+(defun tweak-text (lst caps lit)  ; auxiliary function
+  (when lst 
+    (let ((item (car lst))
+          (rest (cdr lst)))
+      (cond ((eq item #\space) (cons item (tweak-text rest caps lit)))
+            ((member item '(#\! #\? #\.)) (cons item (tweak-text rest t lit)))
+            (lit (cons item (tweak-text rest nil lit)))
+            ((or caps lit) (cons (char-upcase item) (tweak-text rest nil lit)))
+            (t (cons (char-downcase item) (tweak-text rest nil nil)))))))
+
+(defun game-print (lst) 
+  (princ (coerce (tweak-text (coerce (string-trim "() " (prin1-to-string lst)) 
+                                     'list)
+                             t
+                             nil)
+                 'string))
+  (fresh-line))
+
+
+(defun game-repl () 
+  (format *query-io* "> ")
+  (force-output *query-io*)
+  (let ((cmd (game-read)))
+    (unless (eq (car cmd) 'quit)
+      (game-print (game-eval cmd))
+      (game-repl))))
+
+(game-repl)
